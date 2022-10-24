@@ -19,6 +19,7 @@ namespace np = boost::python::numpy;
 // define methods for returning persistence pairs
 // define own class for vertex hash
 // look into more robust typing for img
+// rename package and module in setup.py
 
 //------------------------/ Enum /------------------------//
 
@@ -213,7 +214,7 @@ void DMTGraph::createSimplices(np::ndarray const & img)
    *
    * The plane is triangulated like so:
    *
-   *      O---O---O ...
+   *      O---O---O .  .  .
    *      |  /|  /|
    *      | / | / |
    *      |/  |/  |
@@ -225,6 +226,7 @@ void DMTGraph::createSimplices(np::ndarray const & img)
    *      .         .
    *      .           .
    *      .             .
+   *
    ********************************************************************/
   double * img_ptr = reinterpret_cast<double*>(img.get_data());
   //------------------------/ Create Vertices /------------------------//
@@ -612,7 +614,7 @@ np::ndarray DMTGraph::persistentIntervalsInDimension(int dim)
 }
 
 //------------------------/ C++/Python Compatibility Boilerplater /------------------------//
-BOOST_PYTHON_MODULE(PyDMTGraph)
+BOOST_PYTHON_MODULE(dmtgraph)
 {
   // initialize the boost numpy namespace
   Py_Initialize();

@@ -1,8 +1,17 @@
-To build the model, change directory to src and run
+# pydmtgraph
+
+A Python extension for extracting a graph from a grayscale image. 
+
+### Dependencies
+
+
+
+
+To build the model, change directory to ```src``` and run
 ```
 pip install -e .
 ```
-The ```PyGraphDMT``` module can then be included in Python files with the command
+The ```pydmtgraph``` module can then be included in Python files with the command
 ```
-import PyGraphDMT
+import pydmtgraph
 ```

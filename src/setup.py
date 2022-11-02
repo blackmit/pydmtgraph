@@ -1,3 +1,4 @@
+import os
 from platform import python_version_tuple
 from distutils.core import setup
 from distutils.extension import Extension
@@ -11,7 +12,7 @@ libraries = [f"boost_python{py_version[0]}{py_version[1]}",
 dmtgraph = Extension(
     "pydmtgraph.dmtgraph",
     sources=["pydmtgraph/dmtgraph/DMTGraph.cpp"],
-    library_dirs=["${CONDA_PREFIX}/lib"], # uncomment if you downloaded boost with conda
+    # library_dirs=["${CONDA_PREFIX}/lib"], # uncomment if you downloaded boost with conda
     libraries=libraries,
     extra_compile_args=["--std=c++11"],
 )
@@ -19,6 +20,7 @@ dmtgraph = Extension(
 setup(
     name="pydmtgraph",
     version="0.1",
+    author="Mitchell Black",
     packages=["pydmtgraph"],
     ext_modules=[dmtgraph],
 )

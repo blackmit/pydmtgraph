@@ -20,9 +20,11 @@ namespace np = boost::python::numpy;
 // define own class for vertex hash
 // look into more robust typing for img
 // rename package and module in setup.py
+// create union find class
 
-//------------------------/ Enum /------------------------//
-
+//------------------------/ Enums /------------------------//
+// enum to label an edge as belonging to a vertex-edge
+// persistence pair or an edge-triangle persistent pair
 enum EdgePairType
 {
   VERTEX_EDGE_PAIR,
@@ -40,13 +42,12 @@ struct Vertex
   float value;
   int x; int y;
   // `parent` is used for computing persistence with union find.
-  // TODO: create union find class
   Vertex * parent;
   // `morseParent` is used for finding the path to the
-  // minimum in the delta graph
+  // critical vertex  in the delta forest.
   Vertex * morseParent;
   // `neighbors` stores the list of neighbors
-  // in the delta forest
+  // in the delta forest.
   std::vector<Vertex *> neighbors;
 
   Vertex(int iindex, int ix, int iy, float ivalue)
@@ -64,12 +65,12 @@ struct Vertex
   }
 };
 
-//------------------------/ Hash /------------------------//
 
 namespace std
 {
   template<> struct hash<Vertex*>
   {
+    // hash function for a vertex pointer
     std::size_t operator()(Vertex* const& v) const
     {
       return v->index;
@@ -79,14 +80,18 @@ namespace std
 
 struct Edge
 {
+  int index;
   double value;
   double persistence;
   EdgePairType pairType;
-  Vertex * v1, * v2;   // primal vertices
-  Vertex * dv1, * dv2; // dual vertices/triangles
+  // primal vertices
+  Vertex * v1, * v2;
+  // dual vertices/triangles
+  Vertex * dv1, * dv2;
 
-  Edge(Vertex * iv1, Vertex * iv2, Vertex * idv1, Vertex * idv2)
+  Edge(int iindex, Vertex * iv1, Vertex * iv2, Vertex * idv1, Vertex * idv2)
   {
+    index = iindex;
     v1 = iv1; v2 = iv2;
     dv1 = idv1; dv2 = idv2;
     value = fmax(v1->value, v2->value);
@@ -114,8 +119,8 @@ public:
 private:
   void createSimplices(np::ndarray const &);
   void clear();
-  void collectNeighbors(double);
-  void computerMorseParents();
+  void collectTree(double);
+  void cancelMorsePairs();
   void collectPathToMin(Vertex *);
   void collectUnstableManifold(double, double);
   p::tuple returnUnstableManifold();
@@ -126,12 +131,14 @@ private:
 // Edge comparators for sorting list of edges
 bool edgeCompare(Edge * e1, Edge * e2)
 {
-  return e1->value < e2->value;
+  return e1->value < e2->value
+        || ((e1->value == e2->value) && (e1->index < e2->index));
 }
 
 bool edgeCompareDual(Edge * e1, Edge * e2)
 {
-  return e1->value > e2->value;
+  return e1->value > e2->value
+        || ((e1->value == e2->value) && (e1->index > e2->index));
 }
 
 // Vertex comparators for use in union find
@@ -297,7 +304,8 @@ void DMTGraph::createSimplices(np::ndarray const & img)
       }
 
       // create edge
-      edges.push_back(new Edge(v1, v2, dv1, dv2));
+      int edgeIndex = edges.size();
+      edges.push_back(new Edge(index, v1, v2, dv1, dv2));
     }
   }
   // create horizontal edges
@@ -330,7 +338,8 @@ void DMTGraph::createSimplices(np::ndarray const & img)
       }
 
       // create edge
-      edges.push_back(new Edge(v1, v2, dv1, dv2));
+      int edgeIndex = edges.size();
+      edges.push_back(new Edge(index, v1, v2, dv1, dv2));
     }
   }
 
@@ -350,7 +359,8 @@ void DMTGraph::createSimplices(np::ndarray const & img)
         Vertex * dv2 = dualVertices[dualIndex+1];
 
         // create edge
-        edges.push_back(new Edge(v1, v2, dv1, dv2));
+        int edgeIndex = edges.size();
+        edges.push_back(new Edge(index, v1, v2, dv1, dv2));
     }
   }
 } // end of create simplices
@@ -376,7 +386,7 @@ void DMTGraph::computePersistence()
     double death = e->value;
     double birth = merge(e->v1, e->v2, vertexCompare);
     // `merge` return a NaN if the edge created a 1-dimensional cycle.
-    // Thus, this if handles the case the edge killed a 0-dimensional cycle.
+    // Thus, this if-statement handles the case the edge killed a 0-dimensional cycle.
     if(!std::isnan(birth))
     {
       e->persistence = death - birth;
@@ -394,7 +404,7 @@ void DMTGraph::computePersistence()
     double birth = e->value;
     double death = merge(e->dv1, e->dv2, vertexCompareDual);
     // `merge` return a NaN if the edge killed a 1-dimensional dual cycle.
-    // Thus, by duality, this if handles the case the edge
+    // Thus, by duality, this if-statement handles the case the edge
     // created a 1-dimensional primal cycle.
     if(!std::isnan(death))
     {
@@ -419,13 +429,14 @@ void DMTGraph::clear()
   }
 }
 
-void DMTGraph::collectNeighbors(double delta1)
+void DMTGraph::collectTree(double delta1)
 {
   /*
-    Build the graph induced by all edges that
-      - are in vertex-edge pairs
-      - have persistence less than delta
-  */
+   * Build the tree induced by all edges that
+   *  - are in vertex-edge pairs
+   *  - have persistence less than delta
+   * This is the algorithm 'PerSimpTree' in [Dey, Wang, Wang 2018]
+   */
   for(Edge * e : edges)
   {
     if(e->pairType == VERTEX_EDGE_PAIR && e->persistence < delta1)
@@ -436,13 +447,19 @@ void DMTGraph::collectNeighbors(double delta1)
   }
 }
 
-void DMTGraph::computerMorseParents()
+void DMTGraph::cancelMorsePairs()
 {
+  /*
+   * Compute the Morse vector field by performing Morse cancelation
+   * on all vertex-edge persistence pairs with persistence < delta
+   *
+   * This uses the simplified algorithm presented in [Dey, Wang, Wang 2018]
+   */
   for(Vertex * v : vertices)
   {
     if(!v->morseParent)
     {
-      // find min in v's connected component
+      //------------/ find min in v's connected component /------------//
       std::unordered_set<Vertex *> explored;
       std::queue<Vertex *> queue;
       queue.push(v);
@@ -461,7 +478,7 @@ void DMTGraph::computerMorseParents()
           }
         }
       }
-      // set parents
+      //------------/ set morseParent of each node in connected component  /------------//
       min->morseParent = min;
       queue.push(min);
       // perform a bfs from the root and set parents to the previous node
@@ -499,9 +516,11 @@ void DMTGraph::collectUnstableManifold(double delta1, double delta2)
 void DMTGraph::collectPathToMin(Vertex * v)
 {
   /*
-    Add the path between a vertex 'v' to its critical point
-    to the 1-unstable manifold of the image
-  */
+   * A helper method for collectPathToMin
+   *
+   * Add the path between a vertex 'v' to its critical point
+   * to the 1-unstable manifold of the image
+   */
   Vertex * curr = v;
   while(!unstableManifoldVertices.count(curr) && curr->morseParent != curr)
   {
@@ -565,8 +584,8 @@ p::tuple DMTGraph::computeGraph(double delta1, double delta2=0)
 {
   clear();
   computePersistence();
-  collectNeighbors(delta1);
-  computerMorseParents();
+  collectTree(delta1);
+  cancelMorsePairs();
   collectUnstableManifold(delta1, delta2);
   return returnUnstableManifold();
 }

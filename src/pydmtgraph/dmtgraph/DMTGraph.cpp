@@ -151,7 +151,7 @@ inline bool vertexCompare(Vertex * v1, Vertex * v2)
 inline bool vertexCompareDual(Vertex * dv1, Vertex * dv2)
 {
   return (dv1->value > dv2->value)
-       || ((dv1->value == dv2->value) && (dv1->index < dv2->index));
+       || ((dv1->value == dv2->value) && (dv1->index > dv2->index));
 }
 
 inline Vertex * vertexMin(Vertex * v1, Vertex * v2)
@@ -368,10 +368,11 @@ void DMTGraph::createSimplices(np::ndarray const & img)
 void DMTGraph::computePersistence()
 {
   /*
-    Compute the persistent homology of the image.
-    This method computes persistence using union find on the
-    primal and dual graphs.
-  */
+   *  Compute the persistent homology of the image.
+   *
+   *  This method computes persistence using union find on the
+   *  primal and dual graphs.
+   */
   // if persistence already computed, skip this method
   if(persistenceComputed)
   {
@@ -402,7 +403,13 @@ void DMTGraph::computePersistence()
   for(Edge * e : edges)
   {
     double birth = e->value;
-    double death = merge(e->dv1, e->dv2, vertexCompareDual);
+    double death;
+    if(e->pairType == UNKNOWN_PAIR_TYPE)
+    {
+      death = merge(e->dv1, e->dv2, vertexCompareDual);
+    } else {
+      death = std::numeric_limits<double>::quiet_NaN();
+    } 
     // `merge` return a NaN if the edge killed a 1-dimensional dual cycle.
     // Thus, by duality, this if-statement handles the case the edge
     // created a 1-dimensional primal cycle.
@@ -516,9 +523,9 @@ void DMTGraph::collectUnstableManifold(double delta1, double delta2)
 void DMTGraph::collectPathToMin(Vertex * v)
 {
   /*
-   * A helper method for collectPathToMin
+   * A helper method for collectUnstableManifold
    *
-   * Add the path between a vertex 'v' to its critical point
+   * Add the path between a vertex 'v' and its critical point
    * to the 1-unstable manifold of the image
    */
   Vertex * curr = v;

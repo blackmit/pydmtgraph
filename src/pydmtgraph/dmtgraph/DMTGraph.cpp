@@ -404,12 +404,13 @@ void DMTGraph::computePersistence()
   {
     double birth = e->value;
     double death;
+    // if the edge has already been paired, skip trying to pair it
     if(e->pairType == UNKNOWN_PAIR_TYPE)
     {
       death = merge(e->dv1, e->dv2, vertexCompareDual);
     } else {
       death = std::numeric_limits<double>::quiet_NaN();
-    } 
+    }
     // `merge` return a NaN if the edge killed a 1-dimensional dual cycle.
     // Thus, by duality, this if-statement handles the case the edge
     // created a 1-dimensional primal cycle.

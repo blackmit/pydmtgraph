@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <iostream>
+#include <memory> // auto_ptr
 #include <boost/python.hpp>
 #include <boost/python/numpy.hpp>
 
@@ -66,7 +67,6 @@ struct Vertex
   }
 };
 
-
 namespace std
 {
   template<> struct hash<Vertex*>
@@ -85,10 +85,8 @@ struct Edge
   double value;
   double persistence;
   EdgePairType pairType;
-  // primal vertices
-  Vertex * v1, * v2;
-  // dual vertices/triangles
-  Vertex * dv1, * dv2;
+  Vertex * v1, * v2;   // primal vertices
+  Vertex * dv1, * dv2; // dual vertices/triangles
 
   Edge(int iindex, Vertex * iv1, Vertex * iv2, Vertex * idv1, Vertex * idv2)
   {
@@ -114,6 +112,7 @@ public:
   std::vector< std::pair<Vertex *, Vertex *> >unstableManifoldEdges;
 
   DMTGraph(np::ndarray const &);
+  ~DMTGraph();
   void computePersistence();
   p::tuple computeGraph(double, double);
 
@@ -212,6 +211,22 @@ DMTGraph::DMTGraph(np::ndarray const & img)
   //------------------------/ initialize /------------------------//
   persistenceComputed = false;
   createSimplices(img);
+}
+
+DMTGraph::~DMTGraph()
+{
+  for(Edge * e : edges)
+  {
+    delete e;
+  }
+  for(Vertex * v : vertices)
+  {
+    delete v;
+  }
+  for(Vertex * v : dualVertices)
+  {
+    delete v;
+  }
 }
 
 void DMTGraph::createSimplices(np::ndarray const & img)

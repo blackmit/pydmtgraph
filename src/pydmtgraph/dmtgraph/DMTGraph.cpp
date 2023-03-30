@@ -21,6 +21,7 @@ namespace np = boost::python::numpy;
 // look into more robust typing for img
 // rename package and module in setup.py
 // create union find class
+// fix problem installing with system-wide boost
 
 //------------------------/ Enums /------------------------//
 // enum to label an edge as belonging to a vertex-edge

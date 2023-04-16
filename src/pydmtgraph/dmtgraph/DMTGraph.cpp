@@ -297,7 +297,6 @@ void DMTGraph::createSimplices(np::ndarray const & img)
       int index = r*nCols + c;
       Vertex * v1 = vertices[index];
       Vertex * v2 = vertices[index+nCols];
-
       // retrieve dual vertices
       //
       // if the edge is the first or last in the row
@@ -475,7 +474,7 @@ void DMTGraph::cancelMorsePairs()
 {
   /*
    * Compute the Morse vector field by performing Morse cancelation
-   * on all vertex-edge persistence pairs with persistence < delta
+   * on all vertex-edge persistence pairs with persistence less than delta.
    *
    * This uses the simplified algorithm presented in [Dey, Wang, Wang 2018]
    */
@@ -662,10 +661,28 @@ BOOST_PYTHON_MODULE(dmtgraph)
   // initialize the boost numpy namespace
   Py_Initialize();
   np::initialize();
+  p::docstring_options docstring_options(true, false, false);
   // define the functions so we can call them in Python
   p::def("computeDMTGraph", computeDMTGraph);
   // define the DMT graph class
   p::class_<DMTGraph>("DMTGraph", p::init<np::ndarray>())
-    .def("computeGraph", &DMTGraph::computeGraph);
+    .def(
+      "computeGraph",
+       &DMTGraph::computeGraph,
+       (p::arg("delta1"), p::arg("delta2")=0.0),
+       R""""(Compute the Morse graph of the input image to DMTGraph.
+
+       Args:
+        delta1 (double) : All persistent pairs with persistence
+          less than delta1 will be cancelled.
+        delta2 (double) : computeGraph will only return the unstable
+          1-manifold of edges with value greater than delta2.
+          This allows the graphto be disconnected.
+
+       Returns:
+        vertices: A numpy array of vertex positions
+        edges: A numpy array of edge endpoints.
+          Each endpoint indexes a vertex in vertices)""""
+     );
   ;
 }

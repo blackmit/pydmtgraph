@@ -17,7 +17,7 @@ Boost
 
 To build the model, change directory to ```src``` and run
 ```
-pip install -e .
+pip install .
 ```
 The ```pydmtgraph``` module can then be included in Python files with the command
 ```
